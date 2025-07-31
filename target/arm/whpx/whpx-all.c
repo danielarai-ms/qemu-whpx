@@ -36,6 +36,7 @@
 #include "system/whpx-all.h"
 #include "system/whpx-common.h"
 #include "hw/arm/bsa.h"
+#include "arm-powerctl.h"
 
 #include <winhvplatform.h>
 #include <winhvplatformdefs.h>
@@ -361,9 +362,16 @@ static int whpx_handle_mmio(CPUState *cpu, WHV_MEMORY_ACCESS_CONTEXT *ctx)
     return 0;
 }
 
+static void whpx_psci_cpu_off(ARMCPU *arm_cpu)
+{
+    int32_t ret = arm_set_cpu_off(arm_cpu_mp_affinity(arm_cpu));
+    assert(ret == QEMU_ARM_POWERCTL_RET_SUCCESS);
+}
+
 int whpx_vcpu_run(CPUState *cpu) {
     HRESULT hr;
     struct whpx_state *whpx = &whpx_global;
+    ARMCPU *arm_cpu = ARM_CPU(cpu);
     AccelCPUState *vcpu = cpu->accel;
     int ret;
 
@@ -416,9 +424,14 @@ int whpx_vcpu_run(CPUState *cpu) {
         case WHvRunVpExitReasonArm64Reset:
             if (vcpu->exit_ctx.Arm64Reset.ResetType == WHvArm64ResetTypeReboot) {
                 qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
+                whpx_psci_cpu_off(arm_cpu);
             }
             else if (vcpu->exit_ctx.Arm64Reset.ResetType == WHvArm64ResetTypeReboot){
                 qemu_system_shutdown_request(SHUTDOWN_CAUSE_GUEST_SHUTDOWN);
+                whpx_psci_cpu_off(arm_cpu);
+            }
+            else {
+                abort();
             }
         case WHvRunVpExitReasonNone:
         case WHvRunVpExitReasonUnrecoverableException:

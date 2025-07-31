@@ -325,31 +325,22 @@ static void whpx_set_gp_reg(CPUState *cpu, int rt, uint64_t val)
 
 static int whpx_handle_mmio(CPUState *cpu, WHV_MEMORY_ACCESS_CONTEXT *ctx)
 {
-    uint64_t syndrome = ctx->Syndrome;
-
-    bool isv = syndrome & ARM_EL_ISV;
-    bool iswrite = (syndrome >> 6) & 1;
-    bool sse = (syndrome >> 21) & 1;
-    uint32_t sas = (syndrome >> 22) & 3;
-    uint32_t len = 1 << sas;
-    uint32_t srt = (syndrome >> 16) & 0x1f;
-    uint32_t cm = (syndrome >> 8) & 0x1;
+    bool isv = ctx->Syndrome & ARM_EL_ISV;
     uint64_t val = 0;
-
-    if (cm) {
-        /* We don't cache MMIO regions */
-        abort();
-        return 0;
-    }
+    uint32_t srt = (ctx->Syndrome >> 16) & 0x1f;
+    uint32_t sas = (ctx->Syndrome >> 22) & 3;
+    uint32_t len = 1 << sas;
+    bool sse = (ctx->Syndrome >> 21) & 1;
 
     assert(isv);
 
-    if (iswrite) {
-       val = whpx_get_gp_reg(cpu, srt);
+    if (ctx->Header.InterceptAccessType == WHvMemoryAccessWrite) {
+        val = whpx_get_gp_reg(cpu, srt);
         address_space_write(&address_space_memory,
-                            ctx->Gpa,
-                            MEMTXATTRS_UNSPECIFIED, &val, len);
-    } else {
+                    ctx->Gpa,
+                    MEMTXATTRS_UNSPECIFIED, &val, len);
+    }
+    else if (ctx->Header.InterceptAccessType == WHvMemoryAccessRead) {
         address_space_read(&address_space_memory,
                            ctx->Gpa,
                            MEMTXATTRS_UNSPECIFIED, &val, len);
@@ -358,7 +349,9 @@ static int whpx_handle_mmio(CPUState *cpu, WHV_MEMORY_ACCESS_CONTEXT *ctx)
         }
         whpx_set_gp_reg(cpu, srt, val);
     }
-
+    else {
+        abort();
+    }
     return 0;
 }
 

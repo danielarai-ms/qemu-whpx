@@ -85,15 +85,9 @@ static void whpx_gicv3_set_irq(void *opaque, int irq, int level)
     WHV_INTERRUPT_TYPE interrupt_type = WHvArm64InterruptTypeFixed;
     WHV_INTERRUPT_CONTROL interrupt_control = 
     {interrupt_type = WHvArm64InterruptTypeFixed,
-    .RequestedVector = GIC_INTERNAL + irq, .InterruptControl.Asserted=1};
+    .RequestedVector = GIC_INTERNAL + irq, .InterruptControl.Asserted=level};
 
     whp_dispatch.WHvRequestInterrupt(whpx->partition, &interrupt_control, sizeof(interrupt_control));
-
-    if (!level) {
-        interrupt_control.InterruptControl.Asserted = 0;
-        whp_dispatch.WHvRequestInterrupt(whpx->partition, &interrupt_control, sizeof(interrupt_control));
-    }
-
 }
 
 static void whpx_gicv3_icc_reset(CPUARMState *env, const ARMCPRegInfo *ri)

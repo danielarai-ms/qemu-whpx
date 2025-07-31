@@ -265,7 +265,7 @@ void whpx_vcpu_kick(CPUState *cpu)
  * Memory support.
  */
 
- /* hvf_slot flags */
+ /* whpx_slot flags */
 #define WHPX_SLOT_LOG (1 << 0)
 typedef struct whpx_slot {
     uint64_t start;
@@ -292,7 +292,7 @@ typedef struct WHPXState {
 
 struct mac_slot mac_slots[32];
 
-static int do_hvf_set_memory(whpx_slot *slot, WHV_MAP_GPA_RANGE_FLAGS flags)
+static int do_whpx_set_memory(whpx_slot *slot, WHV_MAP_GPA_RANGE_FLAGS flags)
 {
     struct whpx_state *whpx = &whpx_global;
     struct mac_slot *macslot;
@@ -349,7 +349,7 @@ static void whpx_set_phys_mem(MemoryRegionSection *section, bool add)
         } else if (!memory_region_is_romd(area)) {
             /*
              * If the memory device is not in romd_mode, then we actually want
-             * to remove the hvf memory slot so all accesses will trap.
+             * to remove the whpx memory slot so all accesses will trap.
              */
              add = false;
         }
@@ -377,7 +377,7 @@ static void whpx_set_phys_mem(MemoryRegionSection *section, bool add)
     /* Region needs to be reset. set the size to 0 and remap it. */
     if (mem) {
         mem->size = 0;
-        if (do_hvf_set_memory(mem, 0)) {
+        if (do_whpx_set_memory(mem, 0)) {
             error_report("Failed to reset overlapping slot");
             abort();
         }
@@ -414,7 +414,7 @@ static void whpx_set_phys_mem(MemoryRegionSection *section, bool add)
     mem->start = section->offset_within_address_space;
     mem->region = area;
 
-    if (do_hvf_set_memory(mem, flags)) {
+    if (do_whpx_set_memory(mem, flags)) {
         error_report("Error registering new memory slot");
         abort();
     }

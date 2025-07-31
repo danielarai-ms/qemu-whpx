@@ -413,6 +413,13 @@ int whpx_vcpu_run(CPUState *cpu) {
             cpu->exception_index = EXCP_INTERRUPT;
             ret = 1;
             break;
+        case WHvRunVpExitReasonArm64Reset:
+            if (vcpu->exit_ctx.Arm64Reset.ResetType == WHvArm64ResetTypeReboot) {
+                qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
+            }
+            else if (vcpu->exit_ctx.Arm64Reset.ResetType == WHvArm64ResetTypeReboot){
+                qemu_system_shutdown_request(SHUTDOWN_CAUSE_GUEST_SHUTDOWN);
+            }
         case WHvRunVpExitReasonNone:
         case WHvRunVpExitReasonUnrecoverableException:
         case WHvRunVpExitReasonInvalidVpRegisterValue:

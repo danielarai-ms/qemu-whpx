@@ -408,6 +408,16 @@ int whpx_vcpu_run(CPUState *cpu) {
         case WHvRunVpExitReasonGpaIntercept:
         case WHvRunVpExitReasonUnmappedGpa:
             advance_pc = true;
+
+            if (vcpu->exit_ctx.MemoryAccess.Syndrome >> 8 & 0x1) {
+                error_report("WHPX: cached access to unmapped memory"
+                "Pc = 0x%llx Gva = 0x%llx Gpa = 0x%llx",
+                vcpu->exit_ctx.MemoryAccess.Header.Pc,
+                vcpu->exit_ctx.MemoryAccess.Gpa, 
+                vcpu->exit_ctx.MemoryAccess.Gva);
+                break;
+            }
+
             ret = whpx_handle_mmio(cpu, &vcpu->exit_ctx.MemoryAccess);
             break;
         case WHvRunVpExitReasonCanceled:

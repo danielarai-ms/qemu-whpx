@@ -450,9 +450,7 @@ int whpx_vcpu_run(CPUState *cpu) {
           WHV_REGISTER_VALUE pc;
 
           flush_cpu_state(cpu);
-
-          whpx_get_reg(cpu, WHvArm64RegisterPc, &pc);
-          pc.Reg64 += 4;
+          pc.Reg64 = vcpu->exit_ctx.MemoryAccess.Header.Pc + 4;
           whpx_set_reg(cpu, WHvArm64RegisterPc, pc);
         }
     } while (!ret);

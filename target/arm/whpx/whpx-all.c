@@ -437,6 +437,7 @@ int whpx_vcpu_run(CPUState *cpu) {
             bql_lock();
             whpx_psci_cpu_off(arm_cpu);
             bql_unlock();
+            break;
         case WHvRunVpExitReasonNone:
         case WHvRunVpExitReasonUnrecoverableException:
         case WHvRunVpExitReasonInvalidVpRegisterValue:

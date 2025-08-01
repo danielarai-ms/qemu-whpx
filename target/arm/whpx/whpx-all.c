@@ -726,7 +726,7 @@ int whpx_accel_init(AccelState *as, MachineState *ms) {
         .GicV3Parameters = {
             .GicdBaseAddress = 0x08000000,
             .GitsTranslaterBaseAddress = 0x08080000,
-            .GicLpiIntIdBits = 1,
+            .GicLpiIntIdBits = 0,
             .GicPpiPerformanceMonitorsInterrupt = VIRTUAL_PMU_IRQ,
             .GicPpiOverflowInterruptFromCntv = ARCH_TIMER_VIRT_IRQ
         }

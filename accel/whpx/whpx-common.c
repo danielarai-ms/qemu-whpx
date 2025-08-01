@@ -423,7 +423,6 @@ void whpx_do_set_phys_mem(MemoryRegionSection *section, bool add)
 static void whpx_set_phys_mem(MemoryRegionSection *section, bool add)
 {
     struct whpx_state *whpx = &whpx_global;
-    MemoryRegion *area = section->mr;
 
     if (qatomic_read(&whpx->atomic_partition_set_up)) {
         whpx_do_set_phys_mem(section, add);

@@ -785,17 +785,11 @@ static void whpx_add_gic_dist_section(MemoryRegionSection *section, bool add)
     assert(add);
     assert(!qatomic_read(&whpx->atomic_partition_set_up));
 
-    /* XXX logging */
-    printf("Processing gicdist section\n");
-
-    start_pa = area->offset_within_address_space;
+    start_pa = section->offset_within_address_space;
 
     /*
      * Initialize the interrupt controller properties. The interrupt controller
      * must be initialized before the partition is set up.
-     *
-     * XXX TODO: Refactor with the code in get_cpu_features_from_host to
-     * avoid code duplication.
      */
     memset(&prop, 0, sizeof(WHV_PARTITION_PROPERTY));
     ic_param = &prop.Arm64IcParameters;
@@ -834,12 +828,12 @@ static void whpx_add_gic_dist_section(MemoryRegionSection *section, bool add)
      * TODO: For now, we're not freeing the list, since it might be useful
      * for later debugging.
      */
-    struct whpx_mem_region *deferred;
-    struct whpx_Mem_region *next;
-    QLIST_FOREACH(deferred, &whpx->early_mem_regions, list_links, next) {
-        whpx_do_set_phys_mem(&deferred->section, deferred->add);
-        QLIST_REMOVE(deferred, list_links);
-        q_free(deferred);
+    struct whpx_deferred_mem_region *dfr;
+    struct whpx_deferred_mem_region *next;
+    QLIST_FOREACH_SAFE(dfr, &whpx->deferred_mem_regions, list_links, next) {
+        whpx_do_set_phys_mem(&dfr->section, dfr->add);
+        QLIST_REMOVE(dfr, list_links);
+        g_free(dfr);
     }
 
     qatomic_set(&whpx->atomic_partition_set_up, true);
@@ -847,14 +841,17 @@ static void whpx_add_gic_dist_section(MemoryRegionSection *section, bool add)
 
 void whpx_arch_early_set_phys_mem(MemoryRegionSection *section, bool add)
 {
-    assert(!atomic_read(&whpx->atomic_partition_set_up));
+    struct whpx_state *whpx = &whpx_global;
+    struct MemoryRegion *region = section->mr;
+
+    assert(!qatomic_read(&whpx->atomic_partition_set_up));
     /* The WHP partition has not been set up yet, so we cannot inform
      * the Windows hypervisor about the memory mappings yet. Keep track
      * of the mappings and register them with the hypervisor after the
      * has been set up
      */
-    if (!strcmp(area->name, "gicv3_dist")) {
-        whpx_processs_gic_dist_section(area, add);
+    if (!strcmp(region->name, "gicv3_dist") && add) {
+        whpx_add_gic_dist_section(section, add);
         assert(qatomic_read(&whpx->atomic_partition_set_up));
         whpx_do_set_phys_mem(section, add);
     } else {
@@ -864,9 +861,9 @@ void whpx_arch_early_set_phys_mem(MemoryRegionSection *section, bool add)
         /* We do a semi-deep copy of of the section and its region in case
          * they change after this call.
          */
-        memcpy(&deferred->section, section, sizeof MemoryRegionSection);
-        memcpy(&deferred->region, region, sizeof MemoryRegion);
-        deferred->section->region = &deferred->region;
+        memcpy(&deferred->section, section, sizeof(MemoryRegionSection));
+        memcpy(&deferred->region, region, sizeof(MemoryRegion));
+        deferred->section.mr = &deferred->region;
 
         if (whpx->last_deferred_mem_region != NULL) {
             QLIST_INSERT_AFTER(whpx->last_deferred_mem_region,
@@ -877,6 +874,6 @@ void whpx_arch_early_set_phys_mem(MemoryRegionSection *section, bool add)
                               deferred,
                               list_links);
         }
-        whpx->last = region;
+        whpx->last_deferred_mem_region = deferred;
     }
 }

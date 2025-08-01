@@ -238,7 +238,6 @@ static void whpx_gicv3_realize(DeviceState *dev, Error **errp)
         WHV_REGISTER_VALUE val = {.Reg64 = 0x080A0000 + (0x20000 * i)};
         whpx_set_reg(cpu_state, WHvArm64RegisterGicrBaseGpa, val);
         define_arm_cp_regs(cpu, gicv3_cpuif_reginfo);
-        printf("addr: 0x%lld\n", s->redist_regions[0].iomem.addr);
     }
 
     if (s->maint_irq) {

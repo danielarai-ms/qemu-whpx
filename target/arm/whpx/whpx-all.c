@@ -427,15 +427,16 @@ int whpx_vcpu_run(CPUState *cpu) {
         case WHvRunVpExitReasonArm64Reset:
             if (vcpu->exit_ctx.Arm64Reset.ResetType == WHvArm64ResetTypeReboot) {
                 qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
-                whpx_psci_cpu_off(arm_cpu);
             }
             else if (vcpu->exit_ctx.Arm64Reset.ResetType == WHvArm64ResetTypeReboot){
                 qemu_system_shutdown_request(SHUTDOWN_CAUSE_GUEST_SHUTDOWN);
-                whpx_psci_cpu_off(arm_cpu);
             }
             else {
                 abort();
             }
+            bql_lock();
+            whpx_psci_cpu_off(arm_cpu);
+            bql_unlock();
         case WHvRunVpExitReasonNone:
         case WHvRunVpExitReasonUnrecoverableException:
         case WHvRunVpExitReasonInvalidVpRegisterValue:

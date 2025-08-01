@@ -83,7 +83,7 @@ static void whpx_gicv3_set_irq(void *opaque, int irq, int level)
         return;
     }
     WHV_INTERRUPT_TYPE interrupt_type = WHvArm64InterruptTypeFixed;
-    WHV_INTERRUPT_CONTROL interrupt_control = 
+    WHV_INTERRUPT_CONTROL interrupt_control =
     {interrupt_type = WHvArm64InterruptTypeFixed,
     .RequestedVector = GIC_INTERNAL + irq, .InterruptControl.Asserted=level};
 
@@ -164,6 +164,7 @@ static const ARMCPRegInfo gicv3_cpuif_reginfo[] = {
     },
 };
 
+/*
 static void whpx_set_reg(CPUState *cpu, WHV_REGISTER_NAME reg, WHV_REGISTER_VALUE val)
 {
     struct whpx_state *whpx = &whpx_global;
@@ -175,6 +176,7 @@ static void whpx_set_reg(CPUState *cpu, WHV_REGISTER_NAME reg, WHV_REGISTER_VALU
         error_report("WHPX: Failed to set register %08x, hr=%08lx", reg, hr);
     }
 }
+*/
 
 static void whpx_gicv3_realize(DeviceState *dev, Error **errp)
 {
@@ -232,11 +234,14 @@ static void whpx_gicv3_realize(DeviceState *dev, Error **errp)
         error_report("WHPX: failed to set up interrupt controller");
     }
 */
+
     for (i = 0; i < s->num_cpu; i++) {
         CPUState *cpu_state = qemu_get_cpu(i);
         ARMCPU *cpu = ARM_CPU(cpu_state);
+        /*
         WHV_REGISTER_VALUE val = {.Reg64 = 0x080A0000 + (0x20000 * i)};
         whpx_set_reg(cpu_state, WHvArm64RegisterGicrBaseGpa, val);
+        */
         define_arm_cp_regs(cpu, gicv3_cpuif_reginfo);
     }
 

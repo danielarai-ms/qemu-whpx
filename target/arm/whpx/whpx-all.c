@@ -30,6 +30,7 @@
 #include "cpu.h"
 #include "cpregs.h"
 #include "internals.h"
+#include "hw/intc/arm_gicv3_common.h"
 
 #include "system/whpx-internal.h"
 #include "system/whpx-accel-ops.h"
@@ -40,6 +41,8 @@
 
 #include <winhvplatform.h>
 #include <winhvplatformdefs.h>
+
+#define GICR_BYTES_PER_CPU ((uint64_t)(128 * 1024))
 
 struct whpx_reg_match {
     WHV_REGISTER_NAME reg;
@@ -523,11 +526,44 @@ void whpx_get_registers(CPUState *cpu) {
     aarch64_restore_sp(env, arm_current_el(env));
 }
 
+static uint64_t whpx_get_gicr_base_addr(CPUARMState *env, int cpu_index)
+{
+    assert(cpu_index >= 0);
+    GICv3CPUState *gic_cpu_state = env->gicv3state;
+    assert(gic_cpu_state != NULL);
+    GICv3State *gic_state = gic_cpu_state->gic;
+    assert(gic_state != NULL);
+    assert(gic_state->redist_region_count != NULL);
+    assert(gic_state->redist_regions != NULL);
+
+    /* There may be more than one redistributor region, with each region having
+     * one or more redistributors within that region. Each CPU gets two
+     * contiguous 64K pages. Pages for additional CPUs within the region
+     * follow immediately after the first CPU (no gaps). Different
+     * redistributor regions do not need to be contiguous with each other.
+     */
+
+    for (uint32_t region = 0; region < gic_state->nb_redist_regions; region++) {
+        uint32_t count = gic_state->redist_region_count[region];
+        uint32_t start_index = gic_state->redist_regions[region].cpuidx;
+        uint32_t end_index = start_index + count;
+
+        if (start_index <= cpu_index && end_index > cpu_index) {
+            uint64_t base = gic_state->redist_regions[region].iomem.addr +
+                GICR_BYTES_PER_CPU * (cpu_index - start_index);
+            return base;
+        }
+    }
+    g_assert_not_reached();
+}
+
 void whpx_set_registers(CPUState *cpu, int level) {
+    struct whpx_state *whpx = &whpx_global;
     ARMCPU *arm_cpu = ARM_CPU(cpu);
     CPUARMState *env = &arm_cpu->env;
     WHV_REGISTER_VALUE val;
     int i;
+    int hr;
 
     assert(cpu_is_stopped(cpu) || qemu_cpu_is_self(cpu));
 
@@ -561,6 +597,19 @@ void whpx_set_registers(CPUState *cpu, int level) {
 
         val.Reg64 = arm_cpu->cpreg_values[whpx_sreg_match[i].cp_idx];
         whpx_set_reg(cpu, whpx_sreg_match[i].reg, val);
+    }
+
+    /* The gicr base address may only be set once on each VCPU */
+    if (!cpu->accel->gicr_base_set) {
+        WHV_REGISTER_VALUE gic_base = {};
+        WHV_REGISTER_NAME name = WHvArm64RegisterGicrBaseGpa;
+        uint64_t base = whpx_get_gicr_base_addr(env, cpu->cpu_index);
+        gic_base.Reg64 = base;
+        hr = whp_dispatch.WHvSetVirtualProcessorRegisters(
+            whpx->partition, cpu->cpu_index,
+            &name, 1, &gic_base);
+        assert(!FAILED(hr));
+        cpu->accel->gicr_base_set = true;
     }
 }
 

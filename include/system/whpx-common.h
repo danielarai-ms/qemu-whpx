@@ -11,6 +11,10 @@ struct AccelCPUState {
     uint64_t apic_base;
     bool interruption_pending;
 #endif
+#ifdef TARGET_ARM
+    bool gicr_base_set;
+#endif
+
     /* Must be the last field as it may have a tail */
     WHV_RUN_VP_EXIT_CONTEXT exit_ctx;
 };

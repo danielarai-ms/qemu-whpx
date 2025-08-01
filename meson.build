@@ -885,6 +885,7 @@ accelerators = []
 if get_option('kvm').allowed() and host_os == 'linux'
   accelerators += 'CONFIG_KVM'
 endif
+
 if get_option('whpx').allowed() and host_os == 'windows'
  if cpu == 'i386'
    if get_option('whpx').enabled()
@@ -896,6 +897,7 @@ if get_option('whpx').allowed() and host_os == 'windows'
       cc.has_header('winhvemulation.h', required: get_option('whpx'))
      accelerators += 'CONFIG_WHPX'
    endif
+  endif
  endif
 
 hvf = not_found

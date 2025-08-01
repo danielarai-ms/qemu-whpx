@@ -332,6 +332,13 @@ static int whpx_handle_mmio(CPUState *cpu, WHV_MEMORY_ACCESS_CONTEXT *ctx)
     uint32_t len = 1 << sas;
     bool sse = (ctx->Syndrome >> 21) & 1;
 
+    if (!isv) {
+        AccelCPUState *vcpu = cpu->accel;
+        fprintf(stderr, "Syndrome is 0x%016llx\n", ctx->Syndrome);
+        fprintf(stderr, "ARM_EL_ISV is 0x%016llx\n", (uint64_t) ARM_EL_ISV);
+        fprintf(stderr, "PC is 0x%016llx\n", vcpu->exit_ctx.MemoryAccess.Header.Pc);
+        exit(1);
+    }
     assert(isv);
 
     if (ctx->Header.InterceptAccessType == WHvMemoryAccessWrite) {

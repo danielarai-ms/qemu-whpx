@@ -2279,3 +2279,8 @@ error:
 
     return ret;
 }
+
+void whpx_arch_early_set_phys_mem(MemoryRegionSection *section, bool add)
+{
+    g_assert_not_reached();
+}

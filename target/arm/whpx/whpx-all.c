@@ -771,3 +771,112 @@ error:
 
     return ret;
 }
+
+static void whpx_add_gic_dist_section(MemoryRegionSection *section, bool add)
+{
+    HRESULT hr;
+    WHV_ARM64_IC_PARAMETERS *ic_param;
+    MemoryRegion *region = section->mr;
+    WHV_PARTITION_PROPERTY prop;
+    hwaddr start_pa;
+    struct whpx_state *whpx = &whpx_global;
+
+    assert(!strcmp(region->name, "gicv3_dist"));
+    assert(add);
+    assert(!qatomic_read(&whpx->atomic_partition_set_up));
+
+    /* XXX logging */
+    printf("Processing gicdist section\n");
+
+    start_pa = area->offset_within_address_space;
+
+    /*
+     * Initialize the interrupt controller properties. The interrupt controller
+     * must be initialized before the partition is set up.
+     *
+     * XXX TODO: Refactor with the code in get_cpu_features_from_host to
+     * avoid code duplication.
+     */
+    memset(&prop, 0, sizeof(WHV_PARTITION_PROPERTY));
+    ic_param = &prop.Arm64IcParameters;
+    ic_param->EmulationMode = WHvArm64IcEmulationModeGicV3;
+    ic_param->GicV3Parameters.GicdBaseAddress = start_pa;
+    ic_param->GicV3Parameters.GicLpiIntIdBits = 0;
+
+    ic_param->GicV3Parameters.GicPpiOverflowInterruptFromCntv =
+        ARCH_TIMER_VIRT_IRQ;
+    ic_param->GicV3Parameters.GicPpiPerformanceMonitorsInterrupt =
+        VIRTUAL_PMU_IRQ;
+    hr = whp_dispatch.WHvSetPartitionProperty(
+        whpx->partition,
+        WHvPartitionPropertyCodeArm64IcParameters,
+        &prop,
+        sizeof(WHV_PARTITION_PROPERTY));
+
+    if (FAILED(hr)) {
+        error_report("WHPX: Failed to set interrupt controller properties,"
+                     " hr=%08lx", hr);
+        g_assert_not_reached();
+        return;
+    }
+
+    hr = whp_dispatch.WHvSetupPartition(whpx->partition);
+    if (FAILED(hr)) {
+        error_report("WHPX: Failed to set up partition, hr=%08lx", hr);
+        g_assert_not_reached();
+        return;
+    }
+    qatomic_set(&whpx->atomic_partition_set_up, true);
+
+    /*
+     * Handle any memory regions that were initialized before the gicd region.
+     *
+     * TODO: For now, we're not freeing the list, since it might be useful
+     * for later debugging.
+     */
+    struct whpx_mem_region *deferred;
+    struct whpx_Mem_region *next;
+    QLIST_FOREACH(deferred, &whpx->early_mem_regions, list_links, next) {
+        whpx_do_set_phys_mem(&deferred->section, deferred->add);
+        QLIST_REMOVE(deferred, list_links);
+        q_free(deferred);
+    }
+
+    qatomic_set(&whpx->atomic_partition_set_up, true);
+}
+
+void whpx_arch_early_set_phys_mem(MemoryRegionSection *section, bool add)
+{
+    assert(!atomic_read(&whpx->atomic_partition_set_up));
+    /* The WHP partition has not been set up yet, so we cannot inform
+     * the Windows hypervisor about the memory mappings yet. Keep track
+     * of the mappings and register them with the hypervisor after the
+     * has been set up
+     */
+    if (!strcmp(area->name, "gicv3_dist")) {
+        whpx_processs_gic_dist_section(area, add);
+        assert(qatomic_read(&whpx->atomic_partition_set_up));
+        whpx_do_set_phys_mem(section, add);
+    } else {
+        struct whpx_deferred_mem_region *deferred =
+            g_malloc0(sizeof(struct whpx_deferred_mem_region));
+        assert(deferred != NULL);
+        /* We do a semi-deep copy of of the section and its region in case
+         * they change after this call.
+         */
+        memcpy(&deferred->section, section, sizeof MemoryRegionSection);
+        memcpy(&deferred->region, region, sizeof MemoryRegion);
+        deferred->section->region = &deferred->region;
+
+        if (whpx->last_deferred_mem_region != NULL) {
+            QLIST_INSERT_AFTER(whpx->last_deferred_mem_region,
+                               deferred,
+                               list_links);
+        } else {
+            QLIST_INSERT_HEAD(&whpx->deferred_mem_regions,
+                              deferred,
+                              list_links);
+        }
+        whpx->last = region;
+    }
+}

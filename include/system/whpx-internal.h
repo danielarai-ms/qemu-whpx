@@ -152,4 +152,7 @@ typedef enum WHPFunctionList {
     WINHV_PLATFORM_FNS_SUPPLEMENTAL
 } WHPFunctionList;
 
+bool whpx_arch_early_set_phys_mem(MemoryRegionSection *section, bool add);
+void whpx_do_set_phys_mem(MemoryRegionSection *section, bool add);
+
 #endif /* TARGET_I386_WHPX_INTERNAL_H */

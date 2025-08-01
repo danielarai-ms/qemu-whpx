@@ -425,19 +425,19 @@ static void whpx_process_gic_dist_section(MemoryRegionSection *area, bool add)
 {
     HRESULT hr;
     WHV_ARM64_IC_PARAMETERS *ic_param;
-    MemoryRegion *mr = section->mr;
+    MemoryRegion *region = section->mr;
     WHV_PARTITION_PROPERTY prop;
     hwaddr start_pa;
     struct whpx_state *whpx = &whpx_global;
 
-    assert(!strcmp(mr->name, "gicv3_dist"));
+    assert(!strcmp(region->name, "gicv3_dist"));
     assert(add);
     assert(!qatomic_read(&whpx->atomic_partition_set_up));
 
     /* XXX logging */
     printf("Processing gicdist section\n");
 
-    start_pa = section->offset_within_address_space;
+    start_pa = area->offset_within_address_space;
 
     /*
      * Initialize the interrupt controller properties. The interrupt controller

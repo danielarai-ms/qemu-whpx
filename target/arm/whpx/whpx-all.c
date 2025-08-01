@@ -665,7 +665,7 @@ int whpx_accel_init(AccelState *as, MachineState *ms) {
     }
     QLIST_INIT(&whpx->deferred_mem_regions);
     whpx->last_deferred_mem_region = NULL;
-    atomic_set(&whpx->atomic_partition_set_up, false);
+    qatomic_set(&whpx->atomic_partition_set_up, false);
 
     whpx->mem_quota = ms->ram_size;
 
@@ -724,7 +724,7 @@ int whpx_accel_init(AccelState *as, MachineState *ms) {
     // TODO: delete
     //memset(&prop, 0, sizeof(WHV_PARTITION_PROPERTY));
 
-    /* TODO: Delete after verifying this works
+    /* TODO: Delete after verifying this works*/
     //prop.Arm64IcParameters =
     /*
     WHV_ARM64_IC_PARAMETERS ic_params = {

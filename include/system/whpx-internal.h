@@ -70,9 +70,9 @@ struct whpx_state {
     /* Don't forget to update i386 code */
     bool atomic_partition_set_up;
 
-    struct whpx_mem_region_list deferred_mem_regions;
+    struct whpx_deferred_mem_region_list deferred_mem_regions;
     /* Used for efficiently inserting into the end of deferred_mem_regions */
-    struct whpx_mem_region *last_deferred_mem_region;
+    struct whpx_deferred_mem_region *last_deferred_mem_region;
 };
 
 extern struct whpx_state whpx_global;

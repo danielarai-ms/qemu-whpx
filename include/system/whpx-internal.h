@@ -6,6 +6,9 @@
 #ifdef __x86_64__
 #include <winhvemulation.h>
 #endif
+
+#include "qemu/queue.h"
+
 typedef enum WhpxBreakpointState {
     WHPX_BP_CLEARED = 0,
     WHPX_BP_SET_PENDING,
@@ -31,6 +34,26 @@ struct whpx_breakpoints {
     struct whpx_breakpoint_collection *breakpoints;
 };
 
+//
+// On ARM64, memory regions cannot be added until the partition has been
+// set up, and the partition cannot be set up until the address of the GIC
+// distributor region is known. But QEMU doesn't know where it's going to
+// put the GICD region until it has set up some memory regions (typically
+// the UEFI ROM devices). To get around this problem, WHPX tracks memory
+// regions it has been told about before it sees the GICD region. Once it
+// knows where the GICD region is, it can set up the partition and then
+// register the memory regions that were set up before GICD region.
+//
+struct whpx_deferred_mem_region {
+    MemoryRegionSection section;
+    MemoryRegion region;
+    bool add;
+
+    QLIST_ENTRY(whpx_deferred_mem_region) list_links;
+};
+
+QLIST_HEAD(whpx_deferred_mem_region_list, whpx_deferred_mem_region);
+
 struct whpx_state {
     uint64_t mem_quota;
     WHV_PARTITION_HANDLE partition;
@@ -42,6 +65,14 @@ struct whpx_state {
     bool kernel_irqchip_allowed;
     bool kernel_irqchip_required;
     bool apic_in_platform;
+
+    /* Access with qatomic_set/qatomic_read */
+    /* Don't forget to update i386 code */
+    bool atomic_partition_set_up;
+
+    struct whpx_mem_region_list deferred_mem_regions;
+    /* Used for efficiently inserting into the end of deferred_mem_regions */
+    struct whpx_mem_region *last_deferred_mem_region;
 };
 
 extern struct whpx_state whpx_global;

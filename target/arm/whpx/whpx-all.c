@@ -413,7 +413,7 @@ int whpx_vcpu_run(CPUState *cpu) {
                 error_report("WHPX: cached access to unmapped memory"
                 "Pc = 0x%llx Gva = 0x%llx Gpa = 0x%llx",
                 vcpu->exit_ctx.MemoryAccess.Header.Pc,
-                vcpu->exit_ctx.MemoryAccess.Gpa, 
+                vcpu->exit_ctx.MemoryAccess.Gpa,
                 vcpu->exit_ctx.MemoryAccess.Gva);
                 break;
             }
@@ -663,6 +663,9 @@ int whpx_accel_init(AccelState *as, MachineState *ms) {
         ret = -ENOSYS;
         goto error;
     }
+    QLIST_INIT(&whpx->deferred_mem_regions);
+    whpx->last_deferred_mem_region = NULL;
+    atomic_set(&whpx->atomic_partition_set_up, false);
 
     whpx->mem_quota = ms->ram_size;
 
@@ -718,9 +721,12 @@ int whpx_accel_init(AccelState *as, MachineState *ms) {
         goto error;
     }
 
-    memset(&prop, 0, sizeof(WHV_PARTITION_PROPERTY));
+    // TODO: delete
+    //memset(&prop, 0, sizeof(WHV_PARTITION_PROPERTY));
 
-    //prop.Arm64IcParameters = 
+    /* TODO: Delete after verifying this works
+    //prop.Arm64IcParameters =
+    /*
     WHV_ARM64_IC_PARAMETERS ic_params = {
         .EmulationMode = WHvArm64IcEmulationModeGicV3,
         .GicV3Parameters = {
@@ -750,7 +756,7 @@ int whpx_accel_init(AccelState *as, MachineState *ms) {
         ret = -EINVAL;
         goto error;
     }
-
+    */
     whpx_memory_init();
 
     printf("Windows Hypervisor Platform accelerator is operational\n");

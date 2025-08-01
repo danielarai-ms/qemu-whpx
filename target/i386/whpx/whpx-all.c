@@ -2104,6 +2104,10 @@ int whpx_accel_init(AccelState *as, MachineState *ms)
 
     whpx = &whpx_global;
 
+    QLIST_INIT(&whpx->deferred_mem_regions);
+    whpx->last_deferred_mem_region = NULL;
+    atomic_set(&whpx->atomic_partition_set_up, false);
+
     if (!init_whp_dispatch()) {
         ret = -ENOSYS;
         goto error;
@@ -2259,6 +2263,7 @@ int whpx_accel_init(AccelState *as, MachineState *ms)
         ret = -EINVAL;
         goto error;
     }
+    qatomic_set(&whpx->atomic_partition_set_up, true);
 
     whpx_memory_init();
 

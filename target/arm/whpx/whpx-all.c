@@ -428,7 +428,7 @@ int whpx_vcpu_run(CPUState *cpu) {
             if (vcpu->exit_ctx.Arm64Reset.ResetType == WHvArm64ResetTypeReboot) {
                 qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
             }
-            else if (vcpu->exit_ctx.Arm64Reset.ResetType == WHvArm64ResetTypeReboot){
+            else if (vcpu->exit_ctx.Arm64Reset.ResetType == WHvArm64ResetTypePowerOff){
                 qemu_system_shutdown_request(SHUTDOWN_CAUSE_GUEST_SHUTDOWN);
             }
             else {

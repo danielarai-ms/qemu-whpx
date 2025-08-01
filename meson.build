@@ -887,16 +887,16 @@ if get_option('kvm').allowed() and host_os == 'linux'
 endif
 
 if get_option('whpx').allowed() and host_os == 'windows'
- if cpu == 'i386'
-   if get_option('whpx').enabled()
+  if cpu == 'i386'
+    if get_option('whpx').enabled()
      error('WHPX requires 64-bit host')
-   endif
+    endif
    # Leave CONFIG_WHPX disabled
- else
-   if cc.has_header('winhvplatform.h', required: get_option('whpx')) and \
+  else
+    if cc.has_header('winhvplatform.h', required: get_option('whpx')) and \
       cc.has_header('winhvemulation.h', required: get_option('whpx'))
-     accelerators += 'CONFIG_WHPX'
-   endif
+      accelerators += 'CONFIG_WHPX'
+    endif
   endif
  endif
 

@@ -21,8 +21,10 @@
 
 static void *whpx_cpu_thread_fn(void *arg)
 {
+    struct whpx_state *whpx = &whpx_global;
     CPUState *cpu = arg;
     int r;
+    bool vcpu_initialized = false;
 
     rcu_register_thread();
 
@@ -31,15 +33,31 @@ static void *whpx_cpu_thread_fn(void *arg)
     cpu->thread_id = qemu_get_thread_id();
     current_cpu = cpu;
 
+    /* signal CPU creation, even though we haven't constructed the VP
+     * yet. This is required for the engine to make progress to get the
+     * GIC distributor region so the partition can be set up and the VPs
+     * created
+     */
+    cpu_thread_signal_created(cpu);
+    qemu_guest_random_seed_thread_part2(cpu->random_seed);
+
+    while (!qatomic_read(&whpx->atomic_partition_set_up)) {
+        while (cpu_thread_is_idle(cpu)) {
+            qemu_cond_wait_bql(cpu->halt_cond);
+        }
+        if (cpu->unplug && !cpu_can_run(cpu)) {
+            fprintf(stderr, "CPU %d terminated without running anything",
+                    cpu->cpu_index);
+            goto done;
+        }
+    }
+
     r = whpx_init_vcpu(cpu);
     if (r < 0) {
         fprintf(stderr, "whpx_init_vcpu failed: %s\n", strerror(-r));
         exit(1);
     }
-
-    /* signal CPU creation */
-    cpu_thread_signal_created(cpu);
-    qemu_guest_random_seed_thread_part2(cpu->random_seed);
+    vcpu_initialized = true;
 
     do {
         if (cpu_can_run(cpu)) {
@@ -54,7 +72,10 @@ static void *whpx_cpu_thread_fn(void *arg)
         qemu_wait_io_event_common(cpu);
     } while (!cpu->unplug || cpu_can_run(cpu));
 
-    whpx_destroy_vcpu(cpu);
+done:
+    if (vcpu_initialized) {
+        whpx_destroy_vcpu(cpu);
+    }
     cpu_thread_signal_destroyed(cpu);
     bql_unlock();
     rcu_unregister_thread();

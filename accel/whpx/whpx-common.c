@@ -303,6 +303,9 @@ static int do_whpx_set_memory(whpx_slot *slot, WHV_MAP_GPA_RANGE_FLAGS flags)
     if (macslot->present) {
         if (macslot->size != slot->size) {
             macslot->present = 0;
+            /* XXX logging */
+            fprintf(stderr, "XXX unmap 0x%llx 0x%llx\n", macslot->gpa_start,
+                    macslot->size);;
             hr = whp_dispatch.WHvUnmapGpaRange(whpx->partition, macslot->gpa_start, macslot->size);
             if (FAILED(hr)) {
                 abort();
@@ -317,6 +320,9 @@ static int do_whpx_set_memory(whpx_slot *slot, WHV_MAP_GPA_RANGE_FLAGS flags)
     macslot->present = 1;
     macslot->gpa_start = slot->start;
     macslot->size = slot->size;
+    /* XXX logging */
+    fprintf(stderr, "XXX map 0x%llx 0x%llx\n", macslot->gpa_start,
+            macslot->size);;
     hr = whp_dispatch.WHvMapGpaRange(whpx->partition, slot->mem, slot->start, slot->size, flags);
     return 0;
 }

@@ -45,9 +45,15 @@ struct whpx_breakpoints {
 // register the memory regions that were set up before GICD region.
 //
 struct whpx_deferred_mem_region {
-    MemoryRegionSection section;
-    MemoryRegion region;
-    bool add;
+    /* These two fields used for both map and unmap */
+    WHV_GUEST_PHYSICAL_ADDRESS gpa;
+    uint64_t size;
+
+    /* These two fields used only for map */
+    void *source_address;
+    WHV_MAP_GPA_RANGE_FLAGS flags;
+
+    bool map;
 
     QLIST_ENTRY(whpx_deferred_mem_region) list_links;
 };
@@ -152,7 +158,6 @@ typedef enum WHPFunctionList {
     WINHV_PLATFORM_FNS_SUPPLEMENTAL
 } WHPFunctionList;
 
-void whpx_arch_early_set_phys_mem(MemoryRegionSection *section, bool add);
-void whpx_do_set_phys_mem(MemoryRegionSection *section, bool add);
+void whpx_arch_notify_set_phys_mem(MemoryRegionSection *section, bool add);
 
 #endif /* TARGET_I386_WHPX_INTERNAL_H */

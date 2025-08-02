@@ -292,24 +292,80 @@ typedef struct WHPXState {
 
 struct mac_slot mac_slots[32];
 
-static int do_whpx_set_memory(whpx_slot *slot, WHV_MAP_GPA_RANGE_FLAGS flags)
+static void whpx_defer_memory_map(void *source_address,
+                                  WHV_GUEST_PHYSICAL_ADDRESS gpa,
+                                  uint64_t size,
+                                  WHV_MAP_GPA_RANGE_FLAGS flags, bool map)
 {
     struct whpx_state *whpx = &whpx_global;
+    struct whpx_deferred_mem_region *deferred =
+        g_malloc0(sizeof(struct whpx_deferred_mem_region));
+    assert(deferred != NULL);
+    deferred->gpa = gpa;
+    deferred->size = size;
+    deferred->source_address = source_address;
+    deferred->flags = flags;
+    deferred->map = map;
+
+    if (whpx->last_deferred_mem_region != NULL) {
+        QLIST_INSERT_AFTER(whpx->last_deferred_mem_region,
+                           deferred,
+                           list_links);
+    } else {
+        QLIST_INSERT_HEAD(&whpx->deferred_mem_regions,
+                          deferred,
+                          list_links);
+    }
+    whpx->last_deferred_mem_region = deferred;
+}
+
+/* Unmap a GPA range. The partition might not be set up yet, so we might
+ * have to defer the map call until the partition is set up
+ */
+static void whpx_unmap_gpa_range_safe(WHV_GUEST_PHYSICAL_ADDRESS gpa,
+                                      uint64_t size)
+{
+    struct whpx_state *whpx = &whpx_global;
+
+    if (qatomic_read(&whpx->atomic_partition_set_up)) {
+        HRESULT hr;
+        hr = whp_dispatch.WHvUnmapGpaRange(whpx->partition, gpa, size);
+        if (FAILED(hr)) {
+            abort();
+        }
+    } else {
+        whpx_defer_memory_map(NULL, gpa, size, 0, false);
+    }
+}
+
+static void whpx_map_gpa_range_safe(void *source_address,
+                                    WHV_GUEST_PHYSICAL_ADDRESS gpa,
+                                    uint64_t size,
+                                    WHV_MAP_GPA_RANGE_FLAGS flags)
+{
+    struct whpx_state *whpx = &whpx_global;
+    if (qatomic_read(&whpx->atomic_partition_set_up)) {
+        HRESULT hr;
+        hr = whp_dispatch.WHvMapGpaRange(whpx->partition, source_address,
+                                         gpa, size, flags);
+        if (FAILED(hr)) {
+            abort();
+        }
+    } else {
+        whpx_defer_memory_map(source_address, gpa, size, flags, true);
+    }
+}
+
+static int do_whpx_set_memory(whpx_slot *slot, WHV_MAP_GPA_RANGE_FLAGS flags)
+{
     struct mac_slot *macslot;
-    HRESULT hr;
 
     macslot = &mac_slots[slot->slot_id];
 
     if (macslot->present) {
         if (macslot->size != slot->size) {
             macslot->present = 0;
-            /* XXX logging */
-            fprintf(stderr, "XXX unmap 0x%llx 0x%llx\n", macslot->gpa_start,
-                    macslot->size);;
-            hr = whp_dispatch.WHvUnmapGpaRange(whpx->partition, macslot->gpa_start, macslot->size);
-            if (FAILED(hr)) {
-                abort();
-            }
+            whpx_unmap_gpa_range_safe(macslot->gpa_start, macslot->size);
         }
     }
 
@@ -320,10 +376,7 @@ static int do_whpx_set_memory(whpx_slot *slot, WHV_MAP_GPA_RANGE_FLAGS flags)
     macslot->present = 1;
     macslot->gpa_start = slot->start;
     macslot->size = slot->size;
-    /* XXX logging */
-    fprintf(stderr, "XXX map 0x%llx 0x%llx\n", macslot->gpa_start,
-            macslot->size);;
-    hr = whp_dispatch.WHvMapGpaRange(whpx->partition, slot->mem, slot->start, slot->size, flags);
+    whpx_map_gpa_range_safe(slot->mem, slot->start, slot->size, flags);
     return 0;
 }
 
@@ -341,7 +394,7 @@ static whpx_slot *whpx_find_overlap_slot(uint64_t start, uint64_t size)
     return NULL;
 }
 
-void whpx_do_set_phys_mem(MemoryRegionSection *section, bool add)
+static void whpx_set_phys_mem(MemoryRegionSection *section, bool add)
 {
     whpx_slot *mem;
     MemoryRegion *area = section->mr;
@@ -423,17 +476,6 @@ void whpx_do_set_phys_mem(MemoryRegionSection *section, bool add)
     if (do_whpx_set_memory(mem, flags)) {
         error_report("Error registering new memory slot");
         abort();
-    }
-}
-
-static void whpx_set_phys_mem(MemoryRegionSection *section, bool add)
-{
-    struct whpx_state *whpx = &whpx_global;
-
-    if (qatomic_read(&whpx->atomic_partition_set_up)) {
-        whpx_do_set_phys_mem(section, add);
-    } else {
-        whpx_arch_early_set_phys_mem(section, add);
     }
 }
 

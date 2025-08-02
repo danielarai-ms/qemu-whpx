@@ -890,12 +890,14 @@ static void whpx_add_gic_dist_section(MemoryRegionSection *section, bool add)
     QLIST_FOREACH_SAFE(dfr, &whpx->deferred_mem_regions, list_links, next) {
         HRESULT hr;
         if (dfr->map) {
-            hr = whp_dispatch.WHvUnmapGpaRange(whpx->partition, dfr->gpa,
-                                               dfr->size);
-        } else {
+            fprintf(stderr, "Mapping 0x%llx 0x%llx\n", (uint64_t) dfr->gpa, (uint64_t) dfr->size);
             hr = whp_dispatch.WHvMapGpaRange(whpx->partition,
                                              dfr->source_address, dfr->gpa,
                                              dfr->size, dfr->flags);
+        } else {
+            fprintf(stderr, "unMapping 0x%llx 0x%llx\n", dfr->gpa, dfr->size);
+            hr = whp_dispatch.WHvUnmapGpaRange(whpx->partition, (uint64_t) dfr->gpa,
+                                               (uint64_t) dfr->size);
         }
         if (FAILED(hr)) {
             abort();

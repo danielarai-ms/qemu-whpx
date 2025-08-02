@@ -402,6 +402,8 @@ static void whpx_set_phys_mem(MemoryRegionSection *section, bool add)
     WHV_MAP_GPA_RANGE_FLAGS flags;
     uint64_t page_size = qemu_real_host_page_size();
 
+    whpx_arch_notify_set_phys_mem(section, add);
+
     if (!memory_region_is_ram(area)) {
         if (writable) {
             return;
